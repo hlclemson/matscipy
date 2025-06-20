@@ -139,8 +139,10 @@ def average_potential(
 
     """
 
-    if kind == "eam" or kind == "eam/fs":
+    #if kind == "eam" or kind == "eam/fs":
+    if kind == "eam":
         raise NotImplementedError
+
     assert np.isclose(np.sum(concentrations), 1)
     symbols = [s for s in parameters.symbols] + [avg_atom]
     atomic_numbers = np.r_[parameters.atomic_numbers, atomic_number]
@@ -165,9 +167,26 @@ def average_potential(
     )
     # Average embedding energy and electron density functions
     new_F = np.r_[F, np.zeros((1, F.shape[1]), dtype=F.dtype)]
-    new_f = np.r_[f, np.zeros((1, f.shape[1]), dtype=f.dtype)]
+
+    if kind == "eam/fs":
+        new_f = np.concatenate(
+            (rep, np.zeros((f.shape[0], 1, f.shape[2]), dtype=f.dtype)), axis=1
+        )
+        new_f = np.concatenate(
+            (new_f, np.zeros((1, new_f.shape[1], f.shape[2]), dtype=f.dtype)),
+            axis=0,
+        )
+        new_f[-1, :-1, :] = np.average(f, axis=0, weights=concentrations)
+        new_f[:-1, -1, :] = new_f[-1, :-1, :]
+        # Compute the last electron density on the diagonal.
+        column = new_f[:-1, -1, :]
+        new_f[-1, -1, :] = np.average(column, axis=0, weights=concentrations)
+    else:
+        new_f = np.r_[f, np.zeros((1, f.shape[1]), dtype=f.dtype)]
+        new_f[-1, :] = np.average(f, axis=0, weights=concentrations)
+
     new_F[-1, :] = np.average(F, axis=0, weights=concentrations)
-    new_f[-1, :] = np.average(f, axis=0, weights=concentrations)
+
     # Average the pair potential
     new_rep = np.concatenate(
         (rep, np.zeros((rep.shape[0], 1, rep.shape[2]), dtype=rep.dtype)), axis=1
